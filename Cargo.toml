@@ -1,0 +1,11 @@
+[package]
+name = "gix-demo"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0"
+tokio = { version = "1.0", features = ["full"] }
+clap = { version = "4.4", features = ["derive"] }
+opendal = { path = "opendal/core", features = ["services-git"] }
+futures = "0.3"

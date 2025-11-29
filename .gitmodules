@@ -1,0 +1,3 @@
+[submodule "opendal"]
+	path = opendal
+	url = https://github.com/siomporas/zzz-forks-opendal.git

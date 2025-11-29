@@ -1,0 +1,84 @@
+{
+  "name": "Runway Development (Rust + Python)",
+  "dockerFile": "Dockerfile",
+  "build": {
+    "args": {
+      "RUST_VERSION": "1.91.0"
+    }
+  },
+  "runArgs": [
+    "--platform=${localEnv:DOCKER_DEFAULT_PLATFORM:linux/amd64}",
+    "--network=host",
+    "--cap-add=SYS_ADMIN",
+    "--device=/dev/fuse",
+    "--privileged",
+    "--platform=${localEnv:DOCKER_DEFAULT_PLATFORM:linux/amd64}",
+    "--security-opt",
+    "apparmor=unconfined"
+  ],
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+  "workspaceFolder": "/workspace",
+  "mounts": [
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.kube,target=/home/vscode/.kube,type=bind,consistency=cached",
+    "source=${localWorkspaceFolder}/.devcontainer/buildkitd.tmpl.toml,target=/etc/buildkit/buildkitd.tmpl.toml,type=bind,consistency=cached"
+  ],
+  "containerEnv": {
+    "DOCKER_LOGIN_B64": "${localEnv:DOCKER_LOGIN_B64:}",
+    "GITLAB_TOKEN_B64": "${localEnv:GITLAB_TOKEN_B64:}",
+    "GIT_CREDENTIALS_B64": "${localEnv:GIT_CREDENTIALS_B64:}"
+  },
+  "forwardPorts": false,
+  "portsAttributes": {},
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/git:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-azuretools.vscode-docker",
+        "redhat.vscode-yaml",
+        "eamodio.gitlens",
+        "rust-lang.rust-analyzer",
+        "vadimcn.vscode-lldb",
+        "serayuzgur.crates",
+        "tamasfe.even-better-toml",
+        "humao.rest-client",
+        "editorconfig.editorconfig",
+        "tomrijndorp.find-it-faster",
+        "nefrob.vscode-just-syntax"
+      ],
+      "settings": {
+        "terminal.integrated.fontFamily": "MesloLGS NF, FiraCode Nerd Font Mono, JetBrainsMono Nerd Font, monospace",
+        "terminal.integrated.customGlyphs": true,
+        "rust-analyzer.cargo.buildScripts.enable": true,
+        "rust-analyzer.check.command": "clippy",
+        "rust-analyzer.rustfmt.rangeFormatting.enable": true,
+        "rust-analyzer.rustfmt.extraArgs": [
+          "+nightly",
+          "--config-path",
+          "${workspaceFolder}/.rustfmt.toml"
+        ],
+        "editor.formatOnSave": true,
+        "editor.formatOnSaveMode": "file",
+        "editor.rulers": [
+          88,
+          120
+        ],
+        "[rust]": {
+          "editor.defaultFormatter": "rust-lang.rust-analyzer",
+          "editor.rulers": [
+            120
+          ]
+        },
+        "files.exclude": {
+          "**/__pycache__": true,
+          "**/.pytest_cache": true,
+          "**/*.pyc": true
+        }
+      }
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "remoteUser": "vscode"
+}
