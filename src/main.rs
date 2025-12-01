@@ -3,9 +3,9 @@ use clap::Parser;
 use futures::TryStreamExt;
 use opendal::services::Git;
 use opendal::Operator;
+use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
-use std::future::Future;
 
 /// Git repository inspector using OpenDAL Git service
 #[derive(Parser, Debug)]
@@ -79,7 +79,7 @@ async fn main() -> Result<()> {
     // Recursive download
     let mut count = 0;
     let mut total_size = 0u64;
-    
+
     fn process_directory<'a>(
         op: &'a Operator,
         path: &'a str,
@@ -90,48 +90,48 @@ async fn main() -> Result<()> {
     ) -> Pin<Box<dyn Future<Output = Result<bool>> + 'a>> {
         Box::pin(async move {
             let mut lister = op.lister(path).await?;
-            
+
             while let Some(entry) = lister.try_next().await? {
                 if *count >= max_files {
                     return Ok(true); // Hit limit
                 }
-                
+
                 let metadata = entry.metadata();
                 let entry_path = entry.path();
                 let size = metadata.content_length();
-                
+
                 // Construct full path (entry.path() is already full path from root)
                 let full_path = entry_path.to_string();
-                
+
                 if metadata.is_file() {
                     *total_size += size;
                     *count += 1;
                     println!("  {} ({} bytes)", full_path, size);
-                    
+
                     // Download if output directory is specified
                     if let Some(ref output_dir) = output_dir {
                         let output_path = output_dir.join(full_path.trim_start_matches('/'));
-                        
+
                         // Create parent directories
                         if let Some(parent) = output_path.parent() {
                             std::fs::create_dir_all(parent)?;
                         }
-                        
+
                         // Stream file to disk in chunks (handles large files efficiently)
                         let mut file = std::fs::File::create(&output_path)?;
-                        
+
                         // Read and write in chunks to avoid loading entire file in memory
                         const CHUNK_SIZE: u64 = 8 * 1024 * 1024; // 8MB chunks
                         const PROGRESS_INTERVAL: u64 = 100 * 1024 * 1024; // Report every 100MB
                         let mut offset = 0u64;
                         let mut last_progress = 0u64;
-                        
+
                         // Show initial progress for large files (>100MB)
                         let show_progress = size > PROGRESS_INTERVAL;
                         if show_progress {
                             println!("    Downloading: 0 MB / {} MB (0%)", size / (1024 * 1024));
                         }
-                        
+
                         loop {
                             let end = if size > 0 {
                                 // For known sizes, don't read past the end
@@ -139,38 +139,38 @@ async fn main() -> Result<()> {
                             } else {
                                 offset + CHUNK_SIZE
                             };
-                            
-                            let chunk = op.read_with(&full_path)
-                                .range(offset..end)
-                                .await?;
-                            
+
+                            let chunk = op.read_with(&full_path).range(offset..end).await?;
+
                             if chunk.is_empty() {
                                 break;
                             }
-                            
+
                             std::io::Write::write_all(&mut file, &chunk.to_bytes())?;
                             offset += chunk.len() as u64;
-                            
+
                             // Print progress every 100MB for large files
                             if show_progress && (offset - last_progress) >= PROGRESS_INTERVAL {
                                 let progress_pct = if size > 0 { (offset * 100) / size } else { 0 };
-                                println!("    Downloading: {} MB / {} MB ({}%)", 
-                                    offset / (1024 * 1024), 
+                                println!(
+                                    "    Downloading: {} MB / {} MB ({}%)",
+                                    offset / (1024 * 1024),
                                     size / (1024 * 1024),
-                                    progress_pct);
+                                    progress_pct
+                                );
                                 last_progress = offset;
                             }
-                            
+
                             // Stop if we've read everything
                             if size > 0 && offset >= size {
                                 break;
                             }
-                            
+
                             if chunk.len() < CHUNK_SIZE as usize {
                                 break;
                             }
                         }
-                        
+
                         // Show final progress for large files
                         if show_progress {
                             println!("    Downloaded: {} MB (100%)", size / (1024 * 1024));
@@ -178,20 +178,30 @@ async fn main() -> Result<()> {
                     }
                 } else if metadata.is_dir() {
                     println!("  {}", full_path);
-                    
+
                     // Recursively process subdirectory (use the full path with trailing slash)
-                    if process_directory(op, &full_path, output_dir, count, total_size, max_files).await? {
+                    if process_directory(op, &full_path, output_dir, count, total_size, max_files)
+                        .await?
+                    {
                         return Ok(true); // Hit limit in subdirectory
                     }
                 }
             }
-            
+
             Ok(false)
         })
     }
-    
-    let hit_limit = process_directory(&op, &args.path, &args.output_dir, &mut count, &mut total_size, args.max_files).await?;
-    
+
+    let hit_limit = process_directory(
+        &op,
+        &args.path,
+        &args.output_dir,
+        &mut count,
+        &mut total_size,
+        args.max_files,
+    )
+    .await?;
+
     if hit_limit {
         println!();
         println!("... (truncated, {} file limit reached)", args.max_files);
@@ -201,7 +211,11 @@ async fn main() -> Result<()> {
     println!("Summary:");
     println!("--------");
     println!("Files listed: {}", count);
-    println!("Total size: {} bytes ({:.2} MB)", total_size, total_size as f64 / 1_048_576.0);
+    println!(
+        "Total size: {} bytes ({:.2} MB)",
+        total_size,
+        total_size as f64 / 1_048_576.0
+    );
 
     if let Some(ref output_dir) = args.output_dir {
         println!("Files downloaded to: {}", output_dir.display());
